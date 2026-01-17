@@ -1489,6 +1489,52 @@ describe('add', () => {
       { default: { 'is-positive': '1.0.0' } }
     )
   })
+
+  test('re-adding a dependency with catalogMode: strict does not corrupt catalog entry', async () => {
+    const { options, projects, readLockfile } = preparePackagesAndReturnObjects([{
+      name: 'project1',
+      dependencies: {
+        'is-positive': 'catalog:',
+      },
+    }])
+
+    const catalogs = {
+      default: { 'is-positive': '1.0.0' },
+    }
+
+    await mutateModules(installProjects(projects), {
+      ...options,
+      lockfileOnly: true,
+      catalogs,
+    })
+
+    const { updatedManifest, updatedCatalogs } = await addDependenciesToPackage(
+      projects['project1' as ProjectId],
+      ['is-positive'],
+      {
+        ...options,
+        dir: path.join(options.lockfileDir, 'project1'),
+        lockfileOnly: true,
+        allowNew: true,
+        catalogs,
+        catalogMode: 'strict',
+      })
+
+    expect(updatedManifest).toEqual({
+      name: 'project1',
+      dependencies: {
+        'is-positive': 'catalog:',
+      },
+    })
+
+    if (updatedCatalogs?.default?.['is-positive']) {
+      expect(updatedCatalogs.default['is-positive']).not.toBe('catalog:')
+    }
+
+    const lockfile = readLockfile()
+    expect(lockfile.catalogs.default['is-positive'].specifier).toBe('1.0.0')
+    expect(lockfile.catalogs.default['is-positive'].specifier).not.toBe('catalog:')
+  })
 })
 
 describe('update', () => {
