@@ -107,7 +107,7 @@ export interface ResolveDependenciesResult {
   wantedToBeSkippedPackageIds: Set<string>
 }
 
-export async function resolveDependencies(
+export async function resolveDependencies (
   importers: ImporterToResolve[],
   opts: ResolveDependenciesOptions & {
     defaultUpdateDepth: number
@@ -332,7 +332,7 @@ export async function resolveDependencies(
     updatedCatalogs)
 
   // waiting till package requests are finished
-  async function waitTillAllFetchingsFinish(): Promise<void> {
+  async function waitTillAllFetchingsFinish (): Promise<void> {
     await Promise.all(Object.values(resolvedPkgsById).map(async ({ fetching }) => {
       try {
         await fetching?.()
@@ -353,7 +353,7 @@ export async function resolveDependencies(
   }
 }
 
-function addDirectDependenciesToLockfile(
+function addDirectDependenciesToLockfile (
   newManifest: ProjectManifest,
   projectSnapshot: ProjectSnapshot,
   linkedPackages: Array<{ alias: string }>,
@@ -422,7 +422,7 @@ function addDirectDependenciesToLockfile(
   return newProjectSnapshot
 }
 
-function alignDependencyTypes(manifest: ProjectManifest, projectSnapshot: ProjectSnapshot): void {
+function alignDependencyTypes (manifest: ProjectManifest, projectSnapshot: ProjectSnapshot): void {
   const depTypesOfAliases = getAliasToDependencyTypeMap(manifest)
 
   // Aligning the dependency types in pnpm-lock.yaml
@@ -436,7 +436,7 @@ function alignDependencyTypes(manifest: ProjectManifest, projectSnapshot: Projec
   }
 }
 
-function getAliasToDependencyTypeMap(manifest: ProjectManifest): Record<string, DependenciesField> {
+function getAliasToDependencyTypeMap (manifest: ProjectManifest): Record<string, DependenciesField> {
   const depTypesOfAliases: Record<string, DependenciesField> = {}
   for (const depType of DEPENDENCIES_FIELDS) {
     if (manifest[depType] == null) continue
@@ -449,7 +449,7 @@ function getAliasToDependencyTypeMap(manifest: ProjectManifest): Record<string, 
   return depTypesOfAliases
 }
 
-async function getTopParents(pkgAliases: string[], modulesDir: string): Promise<DependencyManifest[]> {
+async function getTopParents (pkgAliases: string[], modulesDir: string): Promise<DependencyManifest[]> {
   const pkgs = await Promise.all(
     pkgAliases.map((alias) => path.join(modulesDir, alias)).map(safeReadPackageJsonFromDir)
   )
@@ -464,7 +464,7 @@ async function getTopParents(pkgAliases: string[], modulesDir: string): Promise<
     .filter(Boolean) as DependencyManifest[]
 }
 
-function extendGraph(
+function extendGraph (
   graph: DependenciesGraph,
   opts: {
     globalVirtualStoreDir: string
