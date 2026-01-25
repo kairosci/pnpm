@@ -290,7 +290,10 @@ export async function resolveDependencies (
       if (dep.catalogLookup == null) continue
       updatedCatalogs ??= {}
       updatedCatalogs[dep.catalogLookup.catalogName] ??= {}
-      updatedCatalogs[dep.catalogLookup.catalogName][dep.alias] = dep.normalizedBareSpecifier ?? dep.catalogLookup.userSpecifiedBareSpecifier
+      // Use normalizedBareSpecifier if available, otherwise fall back to the catalog's resolved specifier.
+      // We must NOT use userSpecifiedBareSpecifier here as it contains 'catalog:' which would create
+      // an invalid recursive catalog entry.
+      updatedCatalogs[dep.catalogLookup.catalogName][dep.alias] = dep.normalizedBareSpecifier ?? dep.catalogLookup.specifier
     }
   }
 
@@ -331,7 +334,7 @@ export async function resolveDependencies (
     await Promise.all(Object.values(resolvedPkgsById).map(async ({ fetching }) => {
       try {
         await fetching?.()
-      } catch {}
+      } catch { }
     }))
   }
 
@@ -466,7 +469,7 @@ function extendGraph (
     enableGlobalVirtualStore?: boolean
   }
 ): DependenciesGraph {
-  const pkgMetaIter = (function * () {
+  const pkgMetaIter = (function* () {
     for (const depPath in graph) {
       if ((opts.enableGlobalVirtualStore === true || isRuntimeDepPath(depPath as DepPath)) && Object.hasOwn(graph, depPath)) {
         const { name, version, pkgIdWithPatchHash } = graph[depPath as DepPath]
