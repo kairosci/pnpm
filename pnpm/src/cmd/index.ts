@@ -22,6 +22,7 @@ import {
   exec,
   restart,
   run,
+  version,
 } from '@pnpm/plugin-commands-script-runners'
 import { setup } from '@pnpm/plugin-commands-setup'
 import { store } from '@pnpm/plugin-commands-store'
@@ -63,10 +64,10 @@ export type CommandResponse = string | { output?: string, exitCode: number }
 export type Command = (
   (opts: PnpmOptions | any, params: string[]) => CommandResponse | Promise<CommandResponse> // eslint-disable-line @typescript-eslint/no-explicit-any
 ) | (
-  (opts: PnpmOptions | any, params: string[]) => void // eslint-disable-line @typescript-eslint/no-explicit-any
-) | (
-  (opts: PnpmOptions | any, params: string[]) => Promise<void> // eslint-disable-line @typescript-eslint/no-explicit-any
-)
+    (opts: PnpmOptions | any, params: string[]) => void // eslint-disable-line @typescript-eslint/no-explicit-any
+  ) | (
+    (opts: PnpmOptions | any, params: string[]) => Promise<void> // eslint-disable-line @typescript-eslint/no-explicit-any
+  )
 
 export interface CommandDefinition {
   /** The main logic of the command. */
@@ -160,6 +161,7 @@ const commands: CommandDefinition[] = [
   update,
   why,
   createHelp(helpByCommandName),
+  version,
 ]
 
 const handlerByCommandName: Record<string, Command> = {}
