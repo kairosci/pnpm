@@ -1,13 +1,15 @@
 import { jest } from '@jest/globals'
 import { prepareEmpty } from '@pnpm/prepare'
-import { version } from '@pnpm/plugin-commands-script-runners'
-import { runNpm } from '@pnpm/run-npm'
 import type { ProjectRootDir, ProjectsGraph } from '@pnpm/types'
+
 import { DEFAULT_OPTS } from './utils/index.js'
 
 jest.unstable_mockModule('@pnpm/run-npm', () => ({
   runNpm: jest.fn(() => ({ status: 0 })),
 }))
+
+const { runNpm } = await import('@pnpm/run-npm')
+const { version } = await import('@pnpm/plugin-commands-script-runners')
 
 beforeEach(() => {
   jest.clearAllMocks()

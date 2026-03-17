@@ -1,13 +1,14 @@
 import nodePath from 'node:path'
-import pLimit from 'p-limit'
-import { pick } from 'ramda'
-import * as renderHelpModule from 'render-help'
-import { getWorkspaceConcurrency, type Config, types as allTypes } from '@pnpm/config'
+
+import { type Config, getWorkspaceConcurrency, types as allTypes } from '@pnpm/config'
 import { PnpmError } from '@pnpm/error'
 import { tryReadProjectManifest } from '@pnpm/read-project-manifest'
 import { runNpm } from '@pnpm/run-npm'
 import { sortPackages } from '@pnpm/sort-packages'
 import type { Project, ProjectRootDir, ProjectRootDirRealPath } from '@pnpm/types'
+import pLimit from 'p-limit'
+import { pick } from 'ramda'
+import * as renderHelpModule from 'render-help'
 
 const renderHelp = renderHelpModule as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
