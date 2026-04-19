@@ -18,8 +18,6 @@ const NOT_IMPLEMENTED_COMMANDS = [
   's',
   'se',
 
-  'set-script',
-
   'team',
   'token',
 
