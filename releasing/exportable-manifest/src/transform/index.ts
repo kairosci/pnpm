@@ -6,9 +6,9 @@ import { transformBin } from './bin.js'
 import { transformPeerDependenciesMeta } from './peerDependenciesMeta.js'
 import { transformRequiredFields } from './requiredFields.js'
 
-export type ExportedManifest = PackageJSON & { registry?: string }
-
-export type { PackageJSON }
+export interface ExportedManifest extends PackageJSON {
+  registry?: string
+}
 
 export type Transform = (manifest: ProjectManifest) => ExportedManifest
 export const transform: Transform = pipe(
