@@ -33,7 +33,7 @@
     "lint": "eslint src/**/*.ts",
     "compile": "rimraf tsconfig.tsbuildinfo lib && tsc --build",
     "test": "pn compile",
-    "prepublishOnly": "tsgo --build"
+    "prepublishOnly": "pn compile"
   },
   "dependencies": {
     "@pnpm/prepare-temp-dir": "workspace:*",
