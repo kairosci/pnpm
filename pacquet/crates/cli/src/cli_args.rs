@@ -1,6 +1,7 @@
 pub mod add;
 pub mod approve_builds;
 pub mod audit;
+pub mod bugs;
 pub mod cache;
 pub mod cat_file;
 pub mod cat_index;
@@ -52,6 +53,7 @@ use crate::{State, config_deps, config_overrides::ConfigOverrides};
 use add::AddArgs;
 use approve_builds::ApproveBuildsArgs;
 use audit::{AuditArgs, AuditOutcome};
+use bugs::BugsArgs;
 use cache::CacheCommand;
 use cat_file::CatFileArgs;
 use cat_index::CatIndexArgs;
@@ -207,6 +209,8 @@ pub enum CliCommand {
     Ll(ListArgs),
     /// Shows the packages that depend on `pkg`
     Why(WhyArgs),
+    /// Opens the bug tracker URL of a package in the default browser.
+    Bugs(BugsArgs),
     /// Displays your pnpm username.
     Whoami,
     /// Manage a package's distribution tags.
@@ -580,6 +584,18 @@ impl CliArgs {
             // an async future for the request but no reporter-typed
             // fan-out, so it dispatches off `config()` like the other
             // read-only commands.
+            // `bugs` is a read-only registry query: when called with no
+            // arguments it reads the local `package.json` and derives the
+            // bug tracker URL from `bugs` / `repository` fields; when
+            // arguments are given it fetches each package's latest version
+            // from the registry and derives the URL from its published
+            // manifest. No lockfile or install pipeline is needed, so it
+            // dispatches off `config()` like the other read-only commands
+            // that may hit the registry.
+            CliCommand::Bugs(args) => {
+                let cfg: &Config = config()?;
+                Box::pin(async move { args.run(cfg, dir_ref).await })
+            }
             CliCommand::Whoami => {
                 let cfg: &Config = config()?;
                 Box::pin(async move {
