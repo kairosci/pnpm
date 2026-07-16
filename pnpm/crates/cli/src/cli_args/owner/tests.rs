@@ -107,8 +107,6 @@ fn owner_args_with_otp(otp: &str, subcommand: &str, params: &[&str]) -> OwnerArg
     OwnerArgs { registry: None, otp: Some(otp.to_string()), params: all_params }
 }
 
-// ── owner ls HTTP-flow tests ──────────────────────────────────────────
-
 #[tokio::test]
 async fn owner_ls_success() {
     let mut server = mockito::Server::new_async().await;
@@ -130,7 +128,6 @@ async fn owner_ls_success() {
     let result = args.run(&config).await.expect("owner ls must succeed");
 
     mock.assert_async().await;
-    eprintln!("OWNERS:\n{}\n", result.as_deref().unwrap_or_default());
     assert_eq!(result.as_deref(), Some("alice <alice@example.com>\nbob <bob@example.com>"));
 }
 
@@ -273,8 +270,6 @@ async fn owner_ls_no_params_returns_package_required() {
     assert!(formatted.contains("Package name is required"));
 }
 
-// ── owner add HTTP-flow tests ─────────────────────────────────────────
-
 #[tokio::test]
 async fn owner_add_success() {
     let mut server = mockito::Server::new_async().await;
@@ -409,8 +404,6 @@ async fn owner_add_too_few_args() {
     assert!(formatted.contains("Package name and owner are required"));
 }
 
-// ── owner rm HTTP-flow tests ──────────────────────────────────────────
-
 #[tokio::test]
 async fn owner_rm_success() {
     let mut server = mockito::Server::new_async().await;
@@ -532,8 +525,6 @@ async fn owner_rm_encodes_owner_in_url() {
     assert_eq!(result.as_deref(), Some("-user@example.com: my-pkg"));
 }
 
-// ── default subcommand (no subcommand → ls) ──────────────────────────
-
 #[tokio::test]
 async fn owner_no_subcommand_defaults_to_ls() {
     let mut server = mockito::Server::new_async().await;
@@ -551,8 +542,6 @@ async fn owner_no_subcommand_defaults_to_ls() {
     mock.assert_async().await;
     assert_eq!(result.as_deref(), Some("dave <dave@example.com>"));
 }
-
-// ── --registry override ──────────────────────────────────────────────
 
 #[tokio::test]
 async fn owner_ls_registry_override() {
@@ -604,8 +593,6 @@ async fn owner_add_registry_override() {
     override_mock.assert_async().await;
     assert_eq!(result.as_deref(), Some("+alice: my-pkg"));
 }
-
-// ── normalize_registry_url ───────────────────────────────────────────
 
 #[test]
 fn normalize_registry_url_adds_trailing_slash() {
