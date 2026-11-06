@@ -195,6 +195,7 @@ impl DlxArgs {
         // different versions of the same package must not share a cache
         // entry.
         let pkgs = resolve_catalog_specs(&pkgs, config)?;
+        let pkgs = cache::resolve_latest_tags(&pkgs, config).await?;
 
         // The effective (post-`--cpu`/`--os`/`--libc`) architecture set
         // is part of the cache key: it changes which platform-tagged

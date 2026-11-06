@@ -2,4 +2,4 @@
 "pacquet": patch
 ---
 
-`pnpm dlx` now checks for updated versions of packages requested with `@latest`.
+`pnpm dlx` checks the `@latest` tag before reusing a cached install.

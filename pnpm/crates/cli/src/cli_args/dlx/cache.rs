@@ -7,14 +7,76 @@ use super::{
     resolve_from_catalog,
 };
 use pnpm_graph_hasher::{detect_node_major, engine_name};
+use pnpm_package_manager::{PickPolicy, create_configured_registry_resolver};
+use pnpm_resolving_resolver_base::{
+    ResolveOptions, Resolver, VersionSelectionOptions, WantedDependency,
+};
 
 pub(super) fn uses_latest_tag(spec: &str) -> bool {
     let parsed = parse_wanted_dependency(spec);
-    parsed.alias.is_some() && parsed.bare_specifier.as_deref() == Some("latest")
+    parsed.alias.is_some()
+        && parsed.bare_specifier
+            .as_deref()
+            .is_some_and(|specifier| {
+                specifier == "latest"
+                    || specifier
+                        .strip_prefix("npm:")
+                        .is_some_and(|target| target.ends_with("@latest"))
+            })
 }
 
-pub(super) fn cache_max_age(pkgs: &[String], configured_max_age: u64) -> u64 {
-    if pkgs.iter().any(|pkg| uses_latest_tag(pkg)) { 0 } else { configured_max_age }
+pub(super) fn pin_latest_tag(spec: &str, version: &str) -> Option<String> {
+    let parsed = parse_wanted_dependency(spec);
+    let (Some(alias), Some(bare_specifier)) = (parsed.alias, parsed.bare_specifier) else {
+        return None;
+    };
+    if bare_specifier == "latest" {
+        return Some(format!("{alias}@{version}"));
+    }
+    let npm_alias_target = bare_specifier.strip_prefix("npm:")?.strip_suffix("@latest")?;
+    Some(format!("{alias}@{npm_alias_target}@{version}"))
+}
+
+pub(super) async fn resolve_latest_tags(
+    pkgs: &[String],
+    config: &Config,
+) -> miette::Result<Vec<String>> {
+    if !pkgs.iter().any(|pkg| uses_latest_tag(pkg)) {
+        return Ok(pkgs.to_vec());
+    }
+    let policy = PickPolicy::from_config(config).map_err(miette::Report::new)?;
+    let http_client = crate::State::new_http_client(config).map_err(miette::Report::new)?;
+    let resolver = create_configured_registry_resolver(config, http_client, &policy)
+        .map_err(miette::Report::new)?;
+    let options = ResolveOptions {
+        version: VersionSelectionOptions {
+            default_tag: Some("latest".to_string()),
+            ..VersionSelectionOptions::default()
+        },
+        ..ResolveOptions::default()
+    };
+    futures_util::future::try_join_all(
+        pkgs.iter()
+            .map(|pkg| async {
+                if !uses_latest_tag(pkg) {
+                    return Ok(pkg.clone());
+                }
+                let parsed = parse_wanted_dependency(pkg);
+                let wanted = WantedDependency {
+                    alias: parsed.alias,
+                    bare_specifier: parsed.bare_specifier,
+                    ..WantedDependency::default()
+                };
+                let result = Resolver::resolve(&resolver, &wanted, &options)
+                    .await
+                    .map_err(miette::Report::new)?;
+                let Some(name_ver) = result.and_then(|result| result.package.name_ver) else {
+                    return Ok(pkg.clone());
+                };
+                Ok(pin_latest_tag(pkg, &name_ver.suffix).unwrap_or_else(|| pkg.clone()))
+            }),
+    )
+    .await
 }
 
 /// Install the packages into a fresh prepare directory and point the
@@ -439,8 +501,7 @@ pub(super) async fn get_or_prepare_cache<Reporter: self::Reporter + 'static>(
 ) -> miette::Result<PathBuf> {
     let command_dir = command_cache_dir(config, pkgs, allow_build, supported_architectures)?;
     let cache_link = command_dir.join("pkg");
-    let max_age = cache_max_age(pkgs, config.dlx_cache_max_age);
-    match get_valid_cache_dir(&cache_link, max_age, SystemTime::now()) {
+    match get_valid_cache_dir(&cache_link, config.dlx_cache_max_age, SystemTime::now()) {
         Some(cached_dir) if cached_dir.join("pnpm-lock.yaml").is_file() => {
             configure_cache_install(
                 config,

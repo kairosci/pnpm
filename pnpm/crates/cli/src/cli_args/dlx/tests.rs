@@ -1,7 +1,7 @@
 use super::{DlxArgs, DlxError, get_bin_name, scopeless};
 use crate::cli_args::dlx::{
     cache::{
-        cache_max_age, create_cache_key, get_prepare_dir, get_valid_cache_dir, uses_latest_tag,
+        create_cache_key, get_prepare_dir, get_valid_cache_dir, pin_latest_tag, uses_latest_tag,
     },
     clean::clean_expired_dlx_cache,
 };
@@ -249,17 +249,45 @@ fn get_valid_cache_dir_is_none_for_missing_or_plain_dir() {
 }
 
 #[test]
-fn latest_tag_specs_do_not_reuse_an_aged_dlx_cache() {
-    for spec in ["pkg@latest", "@scope/pkg@latest"] {
+fn latest_tag_specs_are_pinned_before_the_cache_key_is_created() {
+    for (spec, pinned) in [
+        ("pkg@latest", "pkg@2.0.0"),
+        ("@scope/pkg@latest", "@scope/pkg@2.0.0"),
+        ("alias@npm:target@latest", "alias@npm:target@2.0.0"),
+        ("alias@npm:@scope/target@latest", "alias@npm:@scope/target@2.0.0"),
+    ] {
         assert!(uses_latest_tag(spec), "{spec} resolves through the latest tag");
+        assert_eq!(pin_latest_tag(spec, "2.0.0").as_deref(), Some(pinned));
+        assert_ne!(
+            create_cache_key(
+                &[pinned.to_string()],
+                &regs("https://registry.npmjs.org/"),
+                &[],
+                None,
+                None
+            ),
+            create_cache_key(
+                &[spec.to_string()],
+                &regs("https://registry.npmjs.org/"),
+                &[],
+                None,
+                None
+            ),
+            "the resolved version must identify the cached install",
+        );
     }
-    for spec in ["pkg", "@scope/pkg", "pkg@1.2.3", "pkg@^1.2.0", "pkg@next", "@scope/pkg@2.0.0"] {
+    for spec in [
+        "pkg",
+        "@scope/pkg",
+        "pkg@1.2.3",
+        "pkg@^1.2.0",
+        "pkg@next",
+        "alias@npm:target@next",
+        "@scope/pkg@2.0.0",
+    ] {
         assert!(!uses_latest_tag(spec), "{spec} does not resolve through the latest tag");
+        assert_eq!(pin_latest_tag(spec, "2.0.0"), None);
     }
-    assert_eq!(cache_max_age(&["pkg@latest".to_string()], 1440), 0);
-    assert_eq!(cache_max_age(&["pkg@1.2.3".to_string()], 1440), 1440);
-    assert_eq!(cache_max_age(&["pkg".to_string()], 1440), 1440);
-    assert_eq!(cache_max_age(&["pkg@latest".to_string(), "pkg@1.2.3".to_string()], 1440), 0);
 }
 
 #[cfg(unix)]
