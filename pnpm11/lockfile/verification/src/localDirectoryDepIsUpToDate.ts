@@ -34,6 +34,7 @@ import {
   getVersionRange,
   isSubdirectory,
   isWorkspacePath,
+  usesInjectionSetting,
   versionSatisfies,
 } from './dependencySpec.js'
 
@@ -42,6 +43,7 @@ export interface LocalDirectoryDepContext {
   lockfilePackages?: PackageSnapshots
   manifestsByDir: Record<string, DependencyManifest>
   workspaceDir?: string
+  injectWorkspacePackages?: boolean
   /** The settings and hooks the lockfile was resolved with. */
   resolution?: LocalDirectoryResolution
   /**
@@ -86,6 +88,7 @@ interface DependencyOfLocalDirectoryDep {
   depName: string
   currentSpec: string
   lockfileDep: string
+  injected: boolean
 }
 
 /**
@@ -342,7 +345,8 @@ async function localChildIsUpToDate (
   lockfileDep: string,
   walk: DirectoryWalk
 ): Promise<boolean> {
-  if (!await localSpecIsUpToDate(localDep, { depName: child.alias, currentSpec, lockfileDep })) return false
+  const injected = child.injected === true || (currentSpec.startsWith('workspace:') && ctx.injectWorkspacePackages === true)
+  if (!await localSpecIsUpToDate(localDep, { depName: child.alias, currentSpec, lockfileDep, injected })) return false
   // A directory child whose spec still matches can itself be stale: its own
   // dependencies may have changed without the directory moving. Links have
   // no dependency snapshot to validate, so only directory children recurse.
@@ -428,8 +432,9 @@ function resolveCatalogSpec (ctx: LocalDirectoryDepContext, dep: { alias: string
 /** Whether a `link:`, `file:` or `workspace:` spec still resolves to the recorded dependency. */
 async function localSpecIsUpToDate (
   localDep: LocalDirectoryDep,
-  { depName, currentSpec, lockfileDep }: DependencyOfLocalDirectoryDep
+  { depName, currentSpec, lockfileDep, injected }: DependencyOfLocalDirectoryDep
 ): Promise<boolean> {
+  if (usesInjectionSetting(currentSpec) && lockfileDep.startsWith('link:') === injected) return false
   if (currentSpec.startsWith('link:')) {
     return (
       lockfileDep.startsWith('link:') &&
