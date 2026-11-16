@@ -1,7 +1,7 @@
 use crate::{Config, HoistingLimits, NodeLinker};
 use serde::{
     Deserialize, Serialize,
-    de::{MapAccess, MapAccessDeserializer, Visitor},
+    de::{MapAccess, Visitor, value::MapAccessDeserializer},
 };
 use std::fmt;
 
