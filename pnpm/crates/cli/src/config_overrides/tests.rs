@@ -635,6 +635,21 @@ fn a_repeated_list_setting_accumulates_its_values() {
     assert_eq!(config.public_hoist_pattern, Some(vec!["types".to_string()]));
 }
 
+#[test]
+fn a_higher_priority_public_pattern_overrides_lower_shamefully_hoist() {
+    let (overrides, _) = ConfigOverrides::extract(argv([
+        "pacquet",
+        "install",
+        "--public-hoist-pattern=types",
+    ]));
+    let mut config = Config::default();
+    config.shamefully_hoist = true;
+    config.public_hoist_pattern = Some(vec!["*".to_string()]);
+    config.explicit_settings.insert("shamefullyHoist".to_string(), true.into());
+    overrides.apply(&mut config, Path::new("/workspace"));
+    assert_eq!(config.public_hoist_pattern, Some(vec!["types".to_string()]));
+}
+
 /// `pnpm clean --lockfile` removes lockfiles; it does not turn the
 /// `lockfile` setting on.
 #[test]
