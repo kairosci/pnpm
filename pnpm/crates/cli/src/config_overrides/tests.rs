@@ -637,11 +637,8 @@ fn a_repeated_list_setting_accumulates_its_values() {
 
 #[test]
 fn a_higher_priority_public_pattern_overrides_lower_shamefully_hoist() {
-    let (overrides, _) = ConfigOverrides::extract(argv([
-        "pacquet",
-        "install",
-        "--public-hoist-pattern=types",
-    ]));
+    let (overrides, _) =
+        ConfigOverrides::extract(argv(["pacquet", "install", "--public-hoist-pattern=types"]));
     let mut config = Config::default();
     config.shamefully_hoist = true;
     config.public_hoist_pattern = Some(vec!["*".to_string()]);

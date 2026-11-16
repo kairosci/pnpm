@@ -80,10 +80,9 @@ fn isolated_object_applies_private_and_public_hoist_patterns() {
 
 #[test]
 fn hoisted_object_applies_hoisting_limits() {
-    let settings: WorkspaceSettings = serde_saphyr::from_str(
-        "nodeLinker:\n  type: hoisted\n  hoistingLimits: workspaces\n",
-    )
-    .unwrap();
+    let settings: WorkspaceSettings =
+        serde_saphyr::from_str("nodeLinker:\n  type: hoisted\n  hoistingLimits: workspaces\n")
+            .unwrap();
     let mut config = Config::default();
     settings.apply_to(&mut config, Path::new("."));
     assert_eq!(config.node_linker, NodeLinker::Hoisted);
@@ -145,11 +144,9 @@ fn null_linker_options_keep_values_from_lower_priority_sources() {
         public_hoist_pattern: Some(vec!["public".to_string()]),
         ..Config::default()
     };
-    serde_saphyr::from_str::<WorkspaceSettings>(
-        "nodeLinker:\n  type: isolated\n  hoist: null\n",
-    )
-    .unwrap()
-    .apply_to(&mut config, Path::new("."));
+    serde_saphyr::from_str::<WorkspaceSettings>("nodeLinker:\n  type: isolated\n  hoist: null\n")
+        .unwrap()
+        .apply_to(&mut config, Path::new("."));
     assert_eq!(config.hoist_pattern, Some(vec!["private".to_string()]));
     assert_eq!(config.public_hoist_pattern, Some(vec!["public".to_string()]));
 }
@@ -163,14 +160,8 @@ fn resetting_node_linker_restores_its_options_and_keeps_flat_aliases() {
     )
     .unwrap()
     .apply_to(&mut config, Path::new("."));
-    config.explicit_settings.insert(
-        "hoistPattern".to_string(),
-        json!(["legacy-pattern"]),
-    );
-    config.explicit_settings.insert(
-        "publicHoistPattern".to_string(),
-        json!(["legacy-public"]),
-    );
+    config.explicit_settings.insert("hoistPattern".to_string(), json!(["legacy-pattern"]));
+    config.explicit_settings.insert("publicHoistPattern".to_string(), json!(["legacy-public"]));
     config.explicit_settings.remove("nodeLinker");
     assert!(WorkspaceSettings::reset_setting_to_default::<crate::Host>(
         &mut config,
