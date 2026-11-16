@@ -642,7 +642,10 @@ fn a_higher_priority_public_pattern_overrides_lower_shamefully_hoist() {
     let mut config = Config {
         shamefully_hoist: true,
         public_hoist_pattern: Some(vec!["*".to_string()]),
-        explicit_settings: serde_json::Map::from_iter([("shamefullyHoist".to_string(), true.into())]),
+        explicit_settings: serde_json::Map::from_iter([(
+            "shamefullyHoist".to_string(),
+            true.into(),
+        )]),
         ..Config::default()
     };
     overrides.apply(&mut config, Path::new("/workspace"));
