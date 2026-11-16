@@ -79,7 +79,7 @@ pub enum NodeLinkerOptions {
     },
     Pnp {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        _marker: Option<std::convert::Infallible>,
+        _marker: Option<()>,
     },
     Loaded {
         #[serde(default)]
