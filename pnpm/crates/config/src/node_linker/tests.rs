@@ -49,6 +49,7 @@ fn scalar_linkers_and_loaded_object_without_exclusions_are_supported() {
 fn node_linker_objects_reject_invalid_and_not_yet_supported_options() {
     for value in [
         json!({"excluded": ["vitest"]}),
+        json!(["hoisted"]),
         json!({"type": "unknown"}),
         json!({"type": "loaded", "exclude": ["vitest"]}),
         json!({"type": "loaded", "excluded": "vitest"}),
@@ -63,6 +64,11 @@ fn node_linker_objects_reject_invalid_and_not_yet_supported_options() {
     ] {
         assert!(serde_json::from_value::<WorkspaceSettings>(json!({"nodeLinker": value})).is_err());
     }
+}
+
+#[test]
+fn node_linker_rejects_sequence_syntax() {
+    assert!(serde_saphyr::from_str::<WorkspaceSettings>("nodeLinker: [hoisted]\n").is_err());
 }
 
 #[test]

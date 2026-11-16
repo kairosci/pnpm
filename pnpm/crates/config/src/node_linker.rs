@@ -1,11 +1,68 @@
 use crate::{Config, HoistingLimits, NodeLinker};
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize, Serialize,
+    de::{MapAccess, MapAccessDeserializer, Visitor},
+};
+use std::fmt;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
 pub enum NodeLinkerSetting {
     Type(NodeLinker),
     Options(NodeLinkerOptions),
+}
+
+impl<'de> Deserialize<'de> for NodeLinkerSetting {
+    fn deserialize<Deserializer>(deserializer: Deserializer) -> Result<Self, Deserializer::Error>
+    where
+        Deserializer: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(NodeLinkerSettingVisitor)
+    }
+}
+
+struct NodeLinkerSettingVisitor;
+
+impl<'de> Visitor<'de> for NodeLinkerSettingVisitor {
+    type Value = NodeLinkerSetting;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a linker name or an object with linker options")
+    }
+
+    fn visit_str<Error>(self, value: &str) -> Result<Self::Value, Error>
+    where
+        Error: serde::de::Error,
+    {
+        let linker = match value {
+            "isolated" => NodeLinker::Isolated,
+            "hoisted" => NodeLinker::Hoisted,
+            "pnp" => NodeLinker::Pnp,
+            "loaded" => NodeLinker::Loaded,
+            _ => {
+                return Err(Error::unknown_variant(
+                    value,
+                    &["isolated", "hoisted", "pnp", "loaded"],
+                ));
+            }
+        };
+        Ok(NodeLinkerSetting::Type(linker))
+    }
+
+    fn visit_string<Error>(self, value: String) -> Result<Self::Value, Error>
+    where
+        Error: serde::de::Error,
+    {
+        self.visit_str(&value)
+    }
+
+    fn visit_map<Map>(self, map: Map) -> Result<Self::Value, Map::Error>
+    where
+        Map: MapAccess<'de>,
+    {
+        NodeLinkerOptions::deserialize(MapAccessDeserializer::new(map))
+            .map(NodeLinkerSetting::Options)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -51,49 +108,18 @@ impl NodeLinkerSetting {
     /// Apply the selected linker and its options.
     pub fn apply_to(self, config: &mut Config) {
         match self {
-            Self::Type(linker) => {
-                config.node_linker = linker;
-                config.node_linker_excluded.clear();
-            }
+            Self::Type(linker) => select_linker(config, linker),
             Self::Options(NodeLinkerOptions::Isolated { hoist }) => {
-                config.node_linker = NodeLinker::Isolated;
-                config.node_linker_excluded.clear();
-                match hoist {
-                    Some(HoistSetting::Enabled(false)) => {
-                        config.hoist = false;
-                        config.hoist_pattern = None;
-                        config.public_hoist_pattern = None;
-                    }
-                    Some(HoistSetting::Enabled(true)) => {
-                        config.hoist = true;
-                        config.hoist_pattern = Some(crate::default_hoist_pattern());
-                        config.public_hoist_pattern = Some(crate::default_public_hoist_pattern());
-                    }
-                    Some(HoistSetting::Patterns(patterns)) => {
-                        config.hoist = true;
-                        if let Some(private) = patterns.private {
-                            config.hoist_pattern = Some(private);
-                        }
-                        if let Some(public) = patterns.public {
-                            config.public_hoist_pattern = Some(public);
-                        }
-                    }
-                    None => {}
-                }
+                select_linker(config, NodeLinker::Isolated);
+                apply_isolated_hoist(config, hoist);
             }
             Self::Options(NodeLinkerOptions::Hoisted { hoisting_limits }) => {
-                config.node_linker = NodeLinker::Hoisted;
-                config.node_linker_excluded.clear();
-                if let Some(limits) = hoisting_limits {
-                    config.hoisting_limits = limits;
-                }
+                select_linker(config, NodeLinker::Hoisted);
+                apply_hoisting_limits(config, hoisting_limits);
             }
-            Self::Options(NodeLinkerOptions::Pnp) => {
-                config.node_linker = NodeLinker::Pnp;
-                config.node_linker_excluded.clear();
-            }
+            Self::Options(NodeLinkerOptions::Pnp) => select_linker(config, NodeLinker::Pnp),
             Self::Options(NodeLinkerOptions::Loaded { excluded }) => {
-                config.node_linker = NodeLinker::Loaded;
+                select_linker(config, NodeLinker::Loaded);
                 config.node_linker_excluded = excluded;
             }
         }
@@ -119,6 +145,42 @@ impl NodeLinkerSetting {
             }),
             NodeLinker::Pnp => Self::Type(NodeLinker::Pnp),
         }
+    }
+}
+
+fn select_linker(config: &mut Config, linker: NodeLinker) {
+    config.node_linker = linker;
+    config.node_linker_excluded.clear();
+}
+
+fn apply_isolated_hoist(config: &mut Config, hoist: Option<HoistSetting>) {
+    match hoist {
+        Some(HoistSetting::Enabled(false)) => {
+            config.hoist = false;
+            config.hoist_pattern = None;
+            config.public_hoist_pattern = None;
+        }
+        Some(HoistSetting::Enabled(true)) => {
+            config.hoist = true;
+            config.hoist_pattern = Some(crate::default_hoist_pattern());
+            config.public_hoist_pattern = Some(crate::default_public_hoist_pattern());
+        }
+        Some(HoistSetting::Patterns(patterns)) => {
+            config.hoist = true;
+            if let Some(private) = patterns.private {
+                config.hoist_pattern = Some(private);
+            }
+            if let Some(public) = patterns.public {
+                config.public_hoist_pattern = Some(public);
+            }
+        }
+        None => {}
+    }
+}
+
+fn apply_hoisting_limits(config: &mut Config, hoisting_limits: Option<HoistingLimits>) {
+    if let Some(hoisting_limits) = hoisting_limits {
+        config.hoisting_limits = hoisting_limits;
     }
 }
 
