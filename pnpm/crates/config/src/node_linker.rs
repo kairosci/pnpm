@@ -78,8 +78,8 @@ pub enum NodeLinkerOptions {
         hoisting_limits: Option<HoistingLimits>,
     },
     Pnp {
-        #[serde(skip)]
-        _marker: (),
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        _marker: Option<std::convert::Infallible>,
     },
     Loaded {
         #[serde(default)]
