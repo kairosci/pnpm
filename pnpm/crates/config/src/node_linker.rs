@@ -77,7 +77,7 @@ pub enum NodeLinkerOptions {
         #[serde(rename = "hoistingLimits")]
         hoisting_limits: Option<HoistingLimits>,
     },
-    Pnp,
+    Pnp {},
     Loaded {
         #[serde(default)]
         excluded: Vec<String>,
@@ -117,7 +117,7 @@ impl NodeLinkerSetting {
                 select_linker(config, NodeLinker::Hoisted);
                 apply_hoisting_limits(config, hoisting_limits);
             }
-            Self::Options(NodeLinkerOptions::Pnp) => select_linker(config, NodeLinker::Pnp),
+            Self::Options(NodeLinkerOptions::Pnp {}) => select_linker(config, NodeLinker::Pnp),
             Self::Options(NodeLinkerOptions::Loaded { excluded }) => {
                 select_linker(config, NodeLinker::Loaded);
                 config.node_linker_excluded = excluded;
