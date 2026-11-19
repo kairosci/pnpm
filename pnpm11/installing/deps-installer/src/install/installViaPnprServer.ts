@@ -17,6 +17,7 @@ import { calcPatchHashes, resolvePatchedDependencies } from '@pnpm/lockfile.sett
 import { logger } from '@pnpm/logger'
 import { groupPatchedDependenciesWithPaths } from '@pnpm/patching.config'
 import type { PnprProject, ResolveViaPnprServerOptions, ResolveViaPnprServerResult } from '@pnpm/pnpr.client'
+import type { ResolutionPolicyViolation } from '@pnpm/resolving.resolver-base'
 import type { DepPath, ProjectId, ProjectManifest, ProjectRootDir } from '@pnpm/types'
 import { safeReadProjectManifestOnly } from '@pnpm/workspace.project-manifest-reader'
 import { pathAbsolute } from 'path-absolute'
@@ -31,6 +32,7 @@ import {
 } from './installPredicates.js'
 import type { InstallResult, MutatedProject, SingleProjectInstallOptions } from './mutationTypes.js'
 import { applyResolvedSpecsFromLockfile, type PnprNewDep } from './pnpr.js'
+import { violationsFromAllowedPicks } from './pnprAllowedPicks.js'
 import { createRootHookOptions } from './rootProjectHooks.js'
 import { buildExoticSubdepsScopeFromProjectDirs } from './verifyLockfileExoticSubdepsScope.js'
 import {
@@ -147,7 +149,7 @@ async function resolveAndInstallViaPnpr (request: PnprRequestContext): Promise<P
 
   await runRootProjectHooks(request)
 
-  const lockfile = await resolveLockfileViaPnpr(request, { existingLockfile, patchedDependencies })
+  const { lockfile, resolutionPolicyViolations } = await resolveLockfileViaPnpr(request, { existingLockfile, patchedDependencies })
 
   // `--lockfile-only`: the pnpr server resolved and we wrote the lockfile, but
   // pnpm fetches nothing and links nothing in this mode — stop before the
@@ -159,10 +161,10 @@ async function resolveAndInstallViaPnpr (request: PnprRequestContext): Promise<P
       ignoredBuilds: undefined,
       stats: { added: 0, removed: 0, linkedToRoot: 0 },
       lockfile,
-      resolutionPolicyViolations: [],
+      resolutionPolicyViolations,
     }
   }
-  return materializePnprLockfile(request, { lockfile, patchGroups })
+  return materializePnprLockfile(request, { lockfile, patchGroups, resolutionPolicyViolations })
 }
 
 /**
@@ -187,7 +189,7 @@ async function runRootProjectHooks (
 async function resolveLockfileViaPnpr (
   request: PnprRequestContext,
   { existingLockfile, patchedDependencies }: { existingLockfile: LockfileFile | null, patchedDependencies: Record<string, string> | undefined }
-): Promise<LockfileObject> {
+): Promise<{ lockfile: LockfileObject, resolutionPolicyViolations: ResolutionPolicyViolation[] }> {
   const { allInstallProjects, lockfileDir, opts, rootDir } = request
   const frozenLockfile = opts.frozenLockfile === true || (
     opts.frozenLockfileIfExists === true && existingLockfile != null && recordsDependencies(existingLockfile)
@@ -197,11 +199,12 @@ async function resolveLockfileViaPnpr (
   await verifyExistingPnprLockfile({ existingLockfile, exoticSubdepsScope, frozenLockfile, opts, pnpmfileChecksum })
 
   logger.info({ message: 'Resolving dependencies via the pnpr server', prefix: rootDir })
-  const { lockfile, stats: pnprStats } = await request.resolveViaPnprServer(
+  const { lockfile, stats: pnprStats, allowedPicks } = await request.resolveViaPnprServer(
     createResolveRequest(request, { existingLockfile, frozenLockfile, patchedDependencies })
   )
   const blockExoticSubdeps = !opts.trustLockfile && Boolean(opts.blockExoticSubdeps)
   await verifyLockfileResolutions(lockfile, [], { blockExoticSubdeps, exoticSubdepsScope })
+  const resolutionPolicyViolations = violationsFromAllowedPicks(allowedPicks, lockfile, opts)
   if (!frozenLockfile) {
     lockfile.pnpmfileChecksum = pnpmfileChecksum
     setUntrackedPnpmfileReadPackageHook(lockfile, getUntrackedPnpmfileReadPackageHook(opts.hooks ?? {}))
@@ -218,7 +221,7 @@ async function resolveLockfileViaPnpr (
   })
   if (allInstallProjects) applyResolvedSpecsToAddedProjects(allInstallProjects, { lockfile, lockfileDir })
   logger.info({ message: `Resolved ${pnprStats.totalPackages} packages`, prefix: rootDir })
-  return lockfile
+  return { lockfile, resolutionPolicyViolations }
 }
 
 async function verifyExistingPnprLockfile ({
@@ -303,6 +306,7 @@ function createResolveRequest (
     minimumReleaseAge: opts.minimumReleaseAge,
     minimumReleaseAgeExclude: opts.minimumReleaseAgeExclude,
     minimumReleaseAgeIgnoreMissingTime: opts.minimumReleaseAgeIgnoreMissingTime,
+    minimumReleaseAgeStrict: opts.minimumReleaseAgeStrict,
     trustPolicy: opts.trustPolicy,
     trustPolicyExclude: opts.trustPolicyExclude,
     trustPolicyIgnoreAfter: opts.trustPolicyIgnoreAfter,
@@ -369,7 +373,7 @@ function applyResolvedSpecsToAddedProjects (
  */
 async function materializePnprLockfile (
   request: PnprRequestContext,
-  { lockfile, patchGroups }: { lockfile: LockfileObject, patchGroups: ReturnType<typeof groupPatchedDependenciesWithPaths> }
+  { lockfile, patchGroups, resolutionPolicyViolations }: { lockfile: LockfileObject, patchGroups: ReturnType<typeof groupPatchedDependenciesWithPaths>, resolutionPolicyViolations: ResolutionPolicyViolation[] }
 ): Promise<PnprInstallResult> {
   const { allInstallProjects, manifest, opts, rootDir, rootProjectPreinstallRan } = request
   const headlessOpts = {
@@ -386,7 +390,7 @@ async function materializePnprLockfile (
       updatedProjects,
       updatedCatalogs: undefined,
       newLockfile: lockfile,
-      resolutionPolicyViolations: [],
+      resolutionPolicyViolations,
     })
   }
   const { ignoredBuilds, stats } = await materializeOrDelegate(
@@ -407,7 +411,7 @@ async function materializePnprLockfile (
     // reports any violation as a terminal `violations` frame, which the
     // client turns into a thrown error — so a resolve that got this far
     // produced a policy-clean lockfile with nothing left to react to.
-    resolutionPolicyViolations: [],
+    resolutionPolicyViolations,
   }
 }
 
